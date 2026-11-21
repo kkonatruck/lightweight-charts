@@ -2,6 +2,7 @@ import { BitmapCoordinatesRenderingScope, CanvasRenderingTarget2D } from 'fancy-
 
 import { ensureNever } from '../../helpers/assertions';
 import { makeFont } from '../../helpers/make-font';
+import { clamp } from '../../helpers/mathex';
 
 import { Coordinate } from '../../model/coordinate';
 import { IPrimitivePaneRenderer, PrimitiveHoveredItem } from '../../model/ipane-primitive';
@@ -98,7 +99,7 @@ export class SeriesMarkersRenderer implements IPrimitivePaneRenderer {
 		});
 	}
 
-	protected _drawImpl({ context: ctx, horizontalPixelRatio, verticalPixelRatio }: BitmapCoordinatesRenderingScope): void {
+	protected _drawImpl({ context: ctx, horizontalPixelRatio, verticalPixelRatio, mediaSize }: BitmapCoordinatesRenderingScope): void {
 		if (this._data === null || this._data.visibleRange === null) {
 			return;
 		}
@@ -110,11 +111,21 @@ export class SeriesMarkersRenderer implements IPrimitivePaneRenderer {
 			if (item.text !== undefined) {
 				item.text.width = this._textWidthCache.measureText(ctx, item.text.content);
 				item.text.height = this._fontSize;
-				item.text.x = item.x - item.text.width / 2 as Coordinate;
+				item.text.x = alignedTextX(item.x, item.text.width, mediaSize.width);
 			}
 			drawItem(item, ctx, horizontalPixelRatio, verticalPixelRatio);
 		}
 	}
+}
+
+// centers the text on the marker, shifted inwards when it would be cut off by a pane edge;
+// markers outside the pane keep the centered position so their text is not pulled into view
+function alignedTextX(markerX: Coordinate, textWidth: number, paneWidth: number): Coordinate {
+	const centered = markerX - textWidth / 2;
+	if (markerX < 0 || markerX > paneWidth) {
+		return centered as Coordinate;
+	}
+	return clamp(centered, 0, Math.max(paneWidth - textWidth, 0)) as Coordinate;
 }
 
 function bitmapShapeItemCoordinates(item: SeriesMarkerRendererDataItem, horizontalPixelRatio: number, verticalPixelRatio: number): BitmapShapeItemCoordinates {
